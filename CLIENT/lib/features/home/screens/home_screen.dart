@@ -8,14 +8,18 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Selamat Datang"),
-      ),
+      appBar: AppBar(title: const Text("Selamat Datang")),
       drawer: const AppDrawer(),
       body: Center(
-        child: ElevatedButton(
-          onPressed: () => context.go('/superior'),
-          child: const Text("Lihat Data Superior"),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ElevatedButton(
+              onPressed: () => context.go('/superior'),
+              child: const Text("Lihat Data Superior"),
+            ),
+            const SizedBox(height: 16),
+          ],
         ),
       ),
     );

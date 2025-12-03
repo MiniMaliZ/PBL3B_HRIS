@@ -30,6 +30,11 @@ class AppDrawer extends StatelessWidget {
             title: const Text("Superior"),
             onTap: () => context.go('/superior'),
           ),
+          ListTile(
+            leading: const Icon(Icons.event),
+            title: const Text("Libur Nasional"),
+            onTap: () => context.go('/holiday'),
+          ),
         ],
       ),
     );
