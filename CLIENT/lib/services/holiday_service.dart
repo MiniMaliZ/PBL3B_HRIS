@@ -150,7 +150,7 @@ class HolidayService {
   }
 
   // Sinkronisasi libur nasional ke database Laravel
-  Future<Map<String, dynamic>> syncNationalHolidays() async {
+  Future<Map<String, dynamic>> syncNationalHolidays([int? currentYear]) async {
     try {
       print('🔄 Starting sync national holidays...');
       final root = await _getBaseUrl();
@@ -209,4 +209,6 @@ class HolidayService {
       return false;
     }
   }
+
+  Future fetchHolidays() async {}
 }
