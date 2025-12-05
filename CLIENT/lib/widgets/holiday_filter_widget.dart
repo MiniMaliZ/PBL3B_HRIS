@@ -15,18 +15,8 @@ class _HolidayFilterWidgetState extends State<HolidayFilterWidget> {
   late int _selectedYear;
 
   final List<String> _monthNames = [
-    'Januari',
-    'Februari',
-    'Maret',
-    'April',
-    'Mei',
-    'Juni',
-    'Juli',
-    'Agustus',
-    'September',
-    'Oktober',
-    'November',
-    'Desember',
+    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
   ];
 
   @override
@@ -56,10 +46,7 @@ class _HolidayFilterWidgetState extends State<HolidayFilterWidget> {
                 child: DropdownButton<int>(
                   value: _selectedMonth,
                   isExpanded: true,
-                  icon: const Icon(
-                    Icons.keyboard_arrow_down,
-                    color: AppColors.primaryDark,
-                  ),
+                  icon: const Icon(Icons.keyboard_arrow_down, color: AppColors.primaryDark),
                   style: const TextStyle(
                     color: AppColors.textDark,
                     fontSize: 14,
@@ -92,14 +79,17 @@ class _HolidayFilterWidgetState extends State<HolidayFilterWidget> {
             child: DropdownButtonHideUnderline(
               child: DropdownButton<int>(
                 value: _selectedYear,
-                icon: const Icon(
-                  Icons.keyboard_arrow_down,
-                  color: AppColors.primaryDark,
+                icon: const Icon(Icons.keyboard_arrow_down, color: AppColors.primaryDark),
+                style: const TextStyle(
+                  color: AppColors.textDark,
+                  fontSize: 14,
                 ),
-                style: const TextStyle(color: AppColors.textDark, fontSize: 14),
                 items: List.generate(10, (index) {
                   final year = DateTime.now().year - 5 + index;
-                  return DropdownMenuItem(value: year, child: Text('$year'));
+                  return DropdownMenuItem(
+                    value: year,
+                    child: Text('$year'),
+                  );
                 }),
                 onChanged: (value) {
                   if (value != null) {

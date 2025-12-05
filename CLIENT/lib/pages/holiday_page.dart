@@ -1,130 +1,203 @@
 import 'package:flutter/material.dart';
-import '../theme/app_theme.dart'; // <-- Tambahkan import
-import '../widgets/app_drawer.dart';
-import '../widgets/holiday_filter_widget.dart';
+import 'package:pbl3b_hris/widgets/holiday_filter_widget.dart';
 import '../services/holiday_service.dart';
+import '../pages/holiday_add_page.dart';
 
 class HolidayPage extends StatefulWidget {
   const HolidayPage({super.key});
 
   @override
-  State<HolidayPage> createState() => _HolidayPageState();
+  _HolidayPageState createState() => _HolidayPageState();
 }
 
 class _HolidayPageState extends State<HolidayPage> {
-  final HolidayService _service = HolidayService();
-  List<dynamic> holidays = [];
-  List<dynamic> filteredHolidays = [];
-  Set<int> selectedIds = {};
-  bool isLoading = true;
-  bool isSelectionMode = false;
-  String? errorMessage;
-
-  int _currentMonth = DateTime.now().month;
-  int _currentYear = DateTime.now().year;
+  final service = HolidayService();
+  List holidays = [];
+  bool loading = true;
+  final Set<dynamic> selectedIds = {}; // selected holiday ids
+  String apiBase = '';
+  String lastMessage = '';
 
   @override
   void initState() {
     super.initState();
-    _initializeData();
-  }
-
-  Future<void> _initializeData() async {
-    await syncNationalHolidays();
-    await loadAll();
-  }
-
-  Future<void> syncNationalHolidays() async {
-    try {
-      await _service.syncNationalHolidays(_currentYear);
-    } catch (e) {
-      debugPrint('Sync error: $e');
-    }
+    loadAll();
+    // Sinkronisasi otomatis data libur nasional
+    syncNationalHolidays();
   }
 
   Future<void> loadAll() async {
-    setState(() {
-      isLoading = true;
-      errorMessage = null;
-    });
+    setState(() => loading = true);
     try {
-      final data = await _service.fetchHolidays();
-      setState(() {
-        holidays = data;
-        _applyFilter();
-        isLoading = false;
-      });
+      // resolve and show which API base URL is used
+      apiBase = await service.getResolvedBaseUrl();
+      print('Using API base in UI: $apiBase');
+      final data = await service.getNationalHolidays();
+      holidays = data;
+
+      if (mounted && data.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: const Text('Tidak ada data hari libur. Coba sinkronisasi atau cek koneksi.'),
+          action: SnackBarAction(label: 'Retry', onPressed: loadAll),
+        ));
+      }
     } catch (e) {
-      setState(() {
-        errorMessage = e.toString();
-        isLoading = false;
-      });
+      lastMessage = e.toString();
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Error mengambil data: $e'),
+        action: SnackBarAction(label: 'Retry', onPressed: loadAll),
+      ));
+      holidays = [];
+    } finally {
+      if (mounted) setState(() => loading = false);
     }
   }
 
-  void _applyFilter() {
-    filteredHolidays = holidays.where((h) {
-      final date = DateTime.tryParse(h['date'] ?? h['tanggal'] ?? '');
-      if (date == null) return false;
-      return date.month == _currentMonth && date.year == _currentYear;
-    }).toList();
-
-    filteredHolidays.sort((a, b) {
-      final dateA = DateTime.tryParse(a['date'] ?? a['tanggal'] ?? '');
-      final dateB = DateTime.tryParse(b['date'] ?? b['tanggal'] ?? '');
-      return (dateA ?? DateTime.now()).compareTo(dateB ?? DateTime.now());
-    });
+  Future<void> filterByMonth(int month) async {
+    setState(() => loading = true);
+    holidays = await service.getHolidayByMonth(month);
+    setState(() => loading = false);
   }
 
-  void _onFilterChanged(int month, int year) {
-    setState(() {
-      _currentMonth = month;
-      _currentYear = year;
-      _applyFilter();
-    });
+  Future<void> filterByMonthYear(int month, int year) async {
+    setState(() => loading = true);
+    holidays = await service.getHolidayByMonthYear(month, year);
+    setState(() => loading = false);
   }
 
-  void _toggleSelection(int id) {
+  bool get isSelectionMode => selectedIds.isNotEmpty;
+
+  void toggleSelection(dynamic id) {
     setState(() {
       if (selectedIds.contains(id)) {
         selectedIds.remove(id);
-        if (selectedIds.isEmpty) isSelectionMode = false;
       } else {
         selectedIds.add(id);
-        isSelectionMode = true;
       }
     });
   }
 
-  Future<void> _deleteSelected() async {
+  Future<void> deleteSelected() async {
+    if (selectedIds.isEmpty) return;
+
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (c) => AlertDialog(
         title: const Text('Konfirmasi Hapus'),
-        content: Text('Hapus ${selectedIds.length} hari libur yang dipilih?'),
+        content: Text(
+            'Anda yakin ingin menghapus ${selectedIds.length} hari libur yang dipilih?'),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Batal'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Hapus'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Batal')),
+          TextButton(onPressed: () => Navigator.pop(c, true), child: const Text('Hapus')),
         ],
       ),
     );
 
-    if (confirm == true) {
-      for (final id in selectedIds) {
-        await _service.deleteHoliday(id);
-      }
-      setState(() {
-        selectedIds.clear();
-        isSelectionMode = false;
-      });
+    if (confirm != true) return;
+
+    setState(() => loading = true);
+    int success = 0;
+
+    // Copy selected ids to avoid modification during iteration
+    final idsToDelete = selectedIds.toList();
+
+    for (final id in idsToDelete) {
+      final ok = await service.deleteHoliday(id);
+      if (ok) success++;
+    }
+
+    // Remove deleted items from local list
+    holidays.removeWhere((h) => idsToDelete.contains(h['id']));
+    selectedIds.clear();
+    setState(() => loading = false);
+
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text('Berhasil menghapus $success item'),
+    ));
+  }
+
+  void goToAddHoliday() async {
+    final refresh = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const AddHolidayPage()),
+    );
+
+    if (refresh == true) {
       loadAll();
+    }
+  }
+
+  void syncNationalHolidays() async {
+    final wasLoading = loading;
+    setState(() => loading = true);
+
+    final result = await service.syncNationalHolidays();
+
+    if (!mounted) return;
+
+    if (result['success']) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result['message']),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      loadAll();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result['message']),
+          backgroundColor: Colors.orange,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      setState(() => loading = wasLoading);
+    }
+  }
+
+  void _showEditApiDialog() async {
+    final controller = TextEditingController(text: apiBase);
+
+    final save = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Edit API Base URL'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Masukkan base URL API (contoh: http://10.0.2.2:8000/api)'),
+            const SizedBox(height: 8),
+            TextField(controller: controller, decoration: const InputDecoration()),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Batal')),
+          TextButton(onPressed: () => Navigator.pop(c, true), child: const Text('Simpan')),
+          TextButton(
+              onPressed: () {
+                // Reset to probe (clear override)
+                service.setResolvedBaseUrl(null);
+                Navigator.pop(c, true);
+              },
+              child: const Text('Reset')),
+        ],
+      ),
+    );
+
+    if (save == true) {
+      final text = controller.text.trim();
+      if (text.isNotEmpty) {
+        service.setResolvedBaseUrl(text);
+      } else {
+        service.setResolvedBaseUrl(null);
+      }
+      // reload with new base
+      apiBase = await service.getResolvedBaseUrl();
+      setState(() {
+        loading = true;
+      });
+      await loadAll();
     }
   }
 
@@ -132,292 +205,126 @@ class _HolidayPageState extends State<HolidayPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Daftar Hari Libur'),
+        title: const Text("Hari Libur"),
         actions: [
-          if (isSelectionMode)
+          if (isSelectionMode) ...[
             IconButton(
-              icon: const Icon(Icons.delete_outline, color: AppColors.error),
-              onPressed: _deleteSelected,
+              icon: selectedIds.length == holidays.length
+                  ? const Icon(Icons.check_box)
+                  : const Icon(Icons.select_all),
+              onPressed: () {
+                setState(() {
+                  if (selectedIds.length == holidays.length) {
+                    selectedIds.clear();
+                  } else {
+                    selectedIds.clear();
+                    for (final h in holidays) {
+                      final id = h['id'];
+                      if (id != null) selectedIds.add(id);
+                    }
+                  }
+                });
+              },
+              tooltip: selectedIds.length == holidays.length ? 'Bersihkan pilihan' : 'Pilih Semua',
             ),
+            IconButton(
+              icon: const Icon(Icons.delete_forever),
+              onPressed: deleteSelected,
+              tooltip: 'Hapus yang dipilih',
+            ),
+          ],
           IconButton(
             icon: const Icon(Icons.sync),
-            onPressed: () async {
-              await syncNationalHolidays();
-              await loadAll();
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Sinkronisasi selesai'),
-                    backgroundColor: AppColors.success,
-                  ),
-                );
-              }
-            },
+            onPressed: syncNationalHolidays,
+            tooltip: "Sinkronisasi Libur Nasional",
+          ),
+          IconButton(
+            icon: const Icon(Icons.add),
+            onPressed: goToAddHoliday,
+            tooltip: "Tambah Hari Libur",
           ),
         ],
       ),
-      drawer: const AppDrawer(),
+
       body: Column(
         children: [
-          HolidayFilterWidget(onFilterChanged: _onFilterChanged),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: HolidayFilterWidget(onFilterChanged: filterByMonthYear),
+          ),
 
-          // Summary Card
+          // Reset filter / show all button
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.primaryDark,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryLight.withOpacity(0.3),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(
-                      Icons.event_available,
-                      color: Colors.white,
-                      size: 28,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Total Hari Libur',
-                        style: TextStyle(
-                          color: AppColors.secondaryLight,
-                          fontSize: 14,
-                        ),
-                      ),
-                      Text(
-                        '${filteredHolidays.length} Hari',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: () {
+                  // Clear selection and reload full list
+                  setState(() {
+                    selectedIds.clear();
+                    loading = true;
+                  });
+                  loadAll();
+                },
+                icon: const Icon(Icons.refresh),
+                label: const Text('Tampilkan Semua'),
               ),
             ),
           ),
 
-          const SizedBox(height: 16),
+          if (lastMessage.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Last: $lastMessage', style: const TextStyle(fontSize: 12, color: Colors.orange)),
+              ),
+            ),
 
-          // List
           Expanded(
-            child: isLoading
-                ? const Center(
-                    child: CircularProgressIndicator(
-                      color: AppColors.primaryDark,
-                    ),
-                  )
-                : errorMessage != null
-                ? _buildErrorWidget()
-                : filteredHolidays.isEmpty
-                ? _buildEmptyWidget()
-                : _buildList(),
-          ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          final result = await Navigator.pushNamed(context, '/holiday/add');
-          if (result == true) loadAll();
-        },
-        child: const Icon(Icons.add),
-      ),
-    );
-  }
+            child: loading
+                ? const Center(child: CircularProgressIndicator())
+                : holidays.isEmpty
+                    ? const Center(
+                        child: Text("Tidak ada data hari libur"),
+                      )
+                    : ListView.builder(
+                        itemCount: holidays.length,
+                        itemBuilder: (context, index) {
+                          final h = holidays[index];
+                          final id = h['id'];
+                          final name = h['name'] ?? h['keterangan'] ?? 'N/A';
+                          final date = h['date'] ?? h['tanggal'] ?? 'N/A';
+                          final selected = selectedIds.contains(id);
 
-  Widget _buildErrorWidget() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.error_outline, size: 64, color: AppColors.error),
-          const SizedBox(height: 16),
-          Text(
-            'Gagal memuat data',
-            style: TextStyle(color: AppColors.textMuted, fontSize: 16),
-          ),
-          const SizedBox(height: 8),
-          ElevatedButton.icon(
-            onPressed: loadAll,
-            icon: const Icon(Icons.refresh),
-            label: const Text('Coba Lagi'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEmptyWidget() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.event_busy_outlined,
-            size: 64,
-            color: AppColors.secondaryLight,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Tidak ada hari libur',
-            style: TextStyle(color: AppColors.textMuted, fontSize: 16),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Bulan ini belum ada data hari libur',
-            style: TextStyle(color: AppColors.textMuted, fontSize: 14),
+                          return Card(
+                            margin: const EdgeInsets.all(12),
+                            child: ListTile(
+                              onLongPress: () => toggleSelection(id),
+                              onTap: () {
+                                if (isSelectionMode) {
+                                  toggleSelection(id);
+                                }
+                              },
+                              title: Text(name),
+                              subtitle: Text("Tanggal: $date"),
+                              leading: isSelectionMode
+                                  ? Checkbox(
+                                      value: selected,
+                                      onChanged: (_) => toggleSelection(id),
+                                    )
+                                  : const Icon(
+                                      Icons.calendar_month,
+                                      color: Colors.red,
+                                    ),
+                            ),
+                          );
+                        },
+                      ),
           ),
         ],
       ),
     );
-  }
-
-  Widget _buildList() {
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      itemCount: filteredHolidays.length,
-      itemBuilder: (context, index) {
-        final holiday = filteredHolidays[index];
-        final id = holiday['id'];
-        final name = holiday['name'] ?? holiday['keterangan'] ?? '-';
-        final dateStr = holiday['date'] ?? holiday['tanggal'] ?? '';
-        final date = DateTime.tryParse(dateStr);
-        final isSelected = selectedIds.contains(id);
-
-        return Card(
-          margin: const EdgeInsets.only(bottom: 8),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: isSelected
-                ? const BorderSide(color: AppColors.primaryDark, width: 2)
-                : BorderSide.none,
-          ),
-          child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 8,
-            ),
-            leading: Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? AppColors.primaryDark
-                    : AppColors.primaryLight.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: isSelectionMode
-                  ? Checkbox(
-                      value: isSelected,
-                      onChanged: (_) => _toggleSelection(id),
-                    )
-                  : Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          date != null ? '${date.day}' : '-',
-                          style: TextStyle(
-                            color: AppColors.primaryDark,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                        Text(
-                          date != null ? _getMonthShort(date.month) : '',
-                          style: TextStyle(
-                            color: AppColors.primaryDark,
-                            fontSize: 10,
-                          ),
-                        ),
-                      ],
-                    ),
-            ),
-            title: Text(
-              name,
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                color: AppColors.textDark,
-              ),
-            ),
-            subtitle: Text(
-              date != null
-                  ? '${_getDayName(date.weekday)}, ${date.day} ${_getMonthName(date.month)} ${date.year}'
-                  : dateStr,
-              style: TextStyle(color: AppColors.textMuted, fontSize: 12),
-            ),
-            onTap: () => _toggleSelection(id),
-            onLongPress: () {
-              setState(() {
-                isSelectionMode = true;
-                selectedIds.add(id);
-              });
-            },
-          ),
-        );
-      },
-    );
-  }
-
-  String _getMonthShort(int month) {
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'Mei',
-      'Jun',
-      'Jul',
-      'Agu',
-      'Sep',
-      'Okt',
-      'Nov',
-      'Des',
-    ];
-    return months[month - 1];
-  }
-
-  String _getMonthName(int month) {
-    const months = [
-      'Januari',
-      'Februari',
-      'Maret',
-      'April',
-      'Mei',
-      'Juni',
-      'Juli',
-      'Agustus',
-      'September',
-      'Oktober',
-      'November',
-      'Desember',
-    ];
-    return months[month - 1];
-  }
-
-  String _getDayName(int weekday) {
-    const days = [
-      'Senin',
-      'Selasa',
-      'Rabu',
-      'Kamis',
-      'Jumat',
-      'Sabtu',
-      'Minggu',
-    ];
-    return days[weekday - 1];
   }
 }
