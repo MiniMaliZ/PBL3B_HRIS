@@ -15,5 +15,11 @@ class DatabaseSeeder extends Seeder
         // $this->call(UsersSeeder::class);
         $this->call(LetterFormatsSeeder::class);
         $this->call(LettersSeeder::class);
+        
+        $this->call([
+        EmployeeSeeder::class,     // harus duluan
+        CheckClockSeeder::class,    // baru check_clocks
+    ]);
+
     }
 }
