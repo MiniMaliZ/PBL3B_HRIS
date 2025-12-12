@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:pbl3b_hris/widgets/holiday_filter_widget.dart';
 import '../services/holiday_service.dart';
-import '../pages/holiday_add_page.dart';
 
 class HolidayPage extends StatefulWidget {
   const HolidayPage({super.key});
@@ -232,7 +231,6 @@ class _HolidayPageState extends State<HolidayPage> {
               onPressed: deleteSelected,
               tooltip: 'Hapus yang dipilih',
             ),
-          ],
           IconButton(
             icon: const Icon(Icons.sync),
             onPressed: syncNationalHolidays,

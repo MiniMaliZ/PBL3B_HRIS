@@ -3,28 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Holiday;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 
 
 class HolidayController extends Controller
 {
-    // Ambil data libur dari DB
-    public function index()
-    {
-        return Holiday::orderBy('date', 'asc')->get();
-    }
-
-    // Fetch libur nasional langsung dari API luar
-    public function fetchNational()
-    {
-        $response = Http::get("https://dayoffapi.vercel.app/api");
-        return $response->json();
-    }
-
-    // Sync libur nasional ke database lokal
-    public function syncNational()
+    // GET: /api/holidays?year=2025
+    public function index(Request $request)
     {
         try {
             // Coba ambil dari API dengan timeout
