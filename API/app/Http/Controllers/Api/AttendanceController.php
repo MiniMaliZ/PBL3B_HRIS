@@ -21,8 +21,8 @@ class AttendanceController extends Controller
         $validator = Validator::make($request->all(), [
             'employee_id' => 'required|exists:employees,id',
             'time' => 'required|date_format:Y-m-d H:i:s',
-            'latitude' => 'required|numeric',
-            'longitude' => 'required|numeric',
+            'latitude' => 'required|numeric', // Tetap butuh ini untuk validasi radius
+            'longitude' => 'required|numeric', // Tetap butuh ini untuk validasi radius
             'check_type' => 'required|in:clock_in,clock_out,overtime_start,overtime_end',
         ]);
 
@@ -40,6 +40,7 @@ class AttendanceController extends Controller
         $department = $employee->department;
 
         // Validasi lokasi - cek apakah ada koordinat departemen
+        // Ini HANYA mengecek jarak, tidak menyimpan koordinat user ke DB
         if ($department->latitude && $department->longitude) {
             $distance = $this->calculateDistance(
                 $validated['latitude'],
@@ -105,8 +106,11 @@ class AttendanceController extends Controller
 
         // Extract hanya waktu (HH:MM:SS) dari datetime (Y-m-d H:i:s)
         $checkClock->clock_in = $this->extractTime($time);
-        $checkClock->latitude = $validated['latitude'];
-        $checkClock->longitude = $validated['longitude'];
+        
+        // HAPUS SIMPAN LAT/LONG
+        // $checkClock->latitude = $validated['latitude'];
+        // $checkClock->longitude = $validated['longitude'];
+
         $checkClock->save();
 
         return $this->success($checkClock, 'Absen masuk berhasil!', 200);
@@ -129,8 +133,10 @@ class AttendanceController extends Controller
 
         // Extract hanya waktu (HH:MM:SS) dari datetime (Y-m-d H:i:s)
         $existing->clock_out = $this->extractTime($time);
-        $existing->latitude = $validated['latitude'];
-        $existing->longitude = $validated['longitude'];
+        
+        // HAPUS SIMPAN LAT/LONG
+        // $existing->latitude = $validated['latitude'];
+        // $existing->longitude = $validated['longitude'];
 
         // FIX: Konversi string ke TINYINT ID
         $existing->check_clock_type = $this->getCheckTypeId($validated['check_type']);
@@ -157,8 +163,10 @@ class AttendanceController extends Controller
 
         // Extract hanya waktu (HH:MM:SS) dari datetime (Y-m-d H:i:s)
         $existing->overtime_start = $this->extractTime($time);
-        $existing->latitude = $validated['latitude'];
-        $existing->longitude = $validated['longitude'];
+        
+        // HAPUS SIMPAN LAT/LONG
+        // $existing->latitude = $validated['latitude'];
+        // $existing->longitude = $validated['longitude'];
 
         // FIX: Konversi string ke TINYINT ID
         $existing->check_clock_type = $this->getCheckTypeId($validated['check_type']);
@@ -185,8 +193,10 @@ class AttendanceController extends Controller
 
         // Extract hanya waktu (HH:MM:SS) dari datetime (Y-m-d H:i:s)
         $existing->overtime_end = $this->extractTime($time);
-        $existing->latitude = $validated['latitude'];
-        $existing->longitude = $validated['longitude'];
+        
+        // HAPUS SIMPAN LAT/LONG
+        // $existing->latitude = $validated['latitude'];
+        // $existing->longitude = $validated['longitude'];
 
         // FIX: Konversi string ke TINYINT ID
         $existing->check_clock_type = $this->getCheckTypeId($validated['check_type']);
@@ -273,8 +283,7 @@ class AttendanceController extends Controller
 
     /**
      * Extract time (HH:MM:SS) from datetime string
-     * 
-     * Input:  2025-12-05 16:30:00
+     * * Input:  2025-12-05 16:30:00
      * Output: 16:30:00
      */
     private function extractTime($datetime)

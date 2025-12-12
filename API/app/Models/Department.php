@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Department extends Model
 {
-    protected $table = 'department'; // pastikan nama tabel sesuai database
+    protected $table = 'departments'; // pastikan nama tabel sesuai database
     protected $fillable = [
         'name',
         'radius',         // misal: "50" meter

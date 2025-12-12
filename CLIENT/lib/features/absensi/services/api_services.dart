@@ -4,7 +4,7 @@ import '../models/attendance_models.dart';
 
 class ApiService {
   // Ubah sesuai URL backend Anda
-  static const String baseUrl = 'http://192.168.11.224:8000/api';
+  static const String baseUrl = 'http://192.168.70.235:8000/api';
   // Untuk testing lokal: http://localhost:8000/api
   // Untuk device: http://{IP_KOMPUTER}:8000/api
 
