@@ -15,8 +15,9 @@ class MyApp extends StatelessWidget {
       routerConfig: AppRoutes.router,
       theme: ThemeData(
         useMaterial3: true,
-        colorSchemeSeed: Colors.blue, // Primary biru
+        colorSchemeSeed: Colors.blue,
+        // theme: AppTheme.lightTheme, // Primary biru
       ),
     );
   }
-}
+} //test
