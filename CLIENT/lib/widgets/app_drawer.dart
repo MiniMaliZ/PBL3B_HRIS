@@ -33,7 +33,7 @@ class AppDrawer extends StatelessWidget {
           ListTile(
             leading: const Icon(Icons.event),
             title: const Text("Libur Nasional"),
-            onTap: () => context.go('/holiday'),
+            onTap: () => context.go('/schedule'),
           ),
         ],
       ),
