@@ -5,13 +5,14 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class Position extends Model
+class Department extends Model
 {
-    protected $table = 'positions';
+    protected $table = 'department'; // pastikan nama tabel sesuai database
     protected $fillable = [
         'name',
-        'rate_reguler',
-        'rate_overtime'
+        'radius',         // misal: "50" meter
+        'latitude',       // tambahkan kolom ini di migration!
+        'longitude'       // tambahkan kolom ini di migration!
     ];
 
     public function employees(): HasMany

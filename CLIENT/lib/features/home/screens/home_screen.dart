@@ -1,6 +1,8 @@
+// lib/features/home/screens/home_screen.dart
+
 import 'package:flutter/material.dart';
-import '../../../widgets/app_drawer.dart';
 import 'package:go_router/go_router.dart';
+import '../../../widgets/app_drawer.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -8,19 +10,57 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Selamat Datang")),
+      appBar: AppBar(title: const Text("Dashboard Karyawan")),
       drawer: const AppDrawer(),
-      body: Center(
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ElevatedButton(
-              onPressed: () => context.go('/superior'),
-              child: const Text("Lihat Data Superior"),
+            const Text(
+              "Pilih Fitur:",
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
+            const SizedBox(height: 20),
+
+            // 🔹 Tombol Absensi
+            _buildFeatureButton(
+              context,
+              icon: Icons.access_time,
+              label: "Absensi",
+              onPressed: () => context.go('/attendance'),
+            ),
+
             const SizedBox(height: 16),
+
+            // 🔹 Tombol Superior (tetap ada)
+            _buildFeatureButton(
+              context,
+              icon: Icons.bar_chart,
+              label: "Data Superior",
+              onPressed: () => context.go('/superior'),
+            ),
+
+            // 🔹 Bisa tambah fitur lain di sini nanti
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildFeatureButton(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required VoidCallback onPressed,
+  }) {
+    return ElevatedButton.icon(
+      onPressed: onPressed,
+      icon: Icon(icon),
+      label: Text(label),
+      style: ElevatedButton.styleFrom(
+        minimumSize: const Size(double.infinity, 50),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }

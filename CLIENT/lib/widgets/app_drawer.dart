@@ -35,6 +35,11 @@ class AppDrawer extends StatelessWidget {
             title: const Text("Libur Nasional"),
             onTap: () => context.go('/schedule'),
           ),
+          ListTile(
+            leading: const Icon(Icons.access_time),
+            title: const Text("Absensi"),
+            onTap: () => context.go('/attendance'),
+          ),
         ],
       ),
     );
