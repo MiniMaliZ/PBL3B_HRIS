@@ -3,14 +3,16 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\LetterFormatController;
 use App\Http\Controllers\Api\LetterController;
-use App\Http\Controllers\Api\HolidayController;
+use App\Http\Controllers\Api\ScheduleController;
+
+Route::prefix('schedules')->group(function () {
+    Route::get('/', [ScheduleController::class, 'index']);                   // GET /api/schedules?year=YYYY
+    Route::get('/sync', [ScheduleController::class, 'sync']);               // GET /api/schedules/sync?year=YYYY
+    Route::get('/month/{month}', [ScheduleController::class, 'byMonth']);   // GET /api/schedules/month/12?year=2025
+    Route::get('/is-holiday/{date}', [ScheduleController::class, 'isHoliday']); // GET /api/schedules/is-holiday/2025-12-25
+    Route::post('/', [ScheduleController::class, 'store']);                 // POST /api/schedules
+    Route::delete('/{id}', [ScheduleController::class, 'destroy']);         // DELETE /api/schedules/{id}
+});
 
 Route::apiResource('letter-formats', LetterFormatController::class);
 Route::apiResource('letters', LetterController::class);
-Route::get('/holidays', [HolidayController::class, 'index']);
-Route::post('/holidays', [HolidayController::class, 'store']);
-Route::get('/national-holidays', [HolidayController::class, 'fetchNational']);
-Route::get('/holidays/fetch-national', [HolidayController::class, 'syncNational']);
-Route::get('/holidays/month/{month}', [HolidayController::class, 'filterByMonth']);
-Route::put('/holidays/{id}', [HolidayController::class, 'update']);
-Route::delete('/holidays/{id}', [HolidayController::class, 'destroy']);
