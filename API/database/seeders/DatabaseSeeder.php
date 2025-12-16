@@ -13,6 +13,15 @@ class DatabaseSeeder extends Seeder
 {
     public function run()
     {
+        // $this->call(UsersSeeder::class);
+        $this->call(LetterFormatsSeeder::class);
+        $this->call(LettersSeeder::class);
+        
+        $this->call([
+        EmployeeSeeder::class,     // harus duluan
+        CheckClockSeeder::class,    // baru check_clocks
+    ]);
+
         $this->command->info('🔄 Starting seeding...');
 
         // 1. Buat positions
