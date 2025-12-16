@@ -13,7 +13,6 @@ class SchedulePage extends StatefulWidget {
 }
 
 class _SchedulePageState extends State<SchedulePage> {
-  final ScheduleService _service = ScheduleService();
   List<dynamic> schedules = [];
   bool isLoading = true;
   String? errorMessage;
@@ -38,7 +37,7 @@ class _SchedulePageState extends State<SchedulePage> {
       errorMessage = null;
     });
     try {
-      final data = await _service.fetchHolidays(year: _currentYear);
+      final data = await ScheduleService.fetchHolidays(year: _currentYear);
       final normalized = data.map((h) {
         final parsed = DateTime.tryParse(h['date'] ?? '');
         return {
@@ -66,7 +65,7 @@ class _SchedulePageState extends State<SchedulePage> {
 
   Future<void> _syncNationalHolidays() async {
     try {
-      await _service.syncNationalHolidays(_currentYear);
+      await ScheduleService.syncNationalHolidays(_currentYear);
       await loadAll();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -91,7 +90,6 @@ class _SchedulePageState extends State<SchedulePage> {
       _currentMonth = focused.month;
       _currentYear = focused.year;
     });
-    // Optionally reload when month/year changes
     loadAll();
   }
 
@@ -187,7 +185,7 @@ class _SchedulePageState extends State<SchedulePage> {
                   trailing: IconButton(
                     icon: const Icon(Icons.delete, color: Colors.red),
                     onPressed: () async {
-                      await _service.deleteHoliday(h['id']);
+                      await ScheduleService.deleteHoliday(h['id']);
                       loadAll();
                     },
                   ),

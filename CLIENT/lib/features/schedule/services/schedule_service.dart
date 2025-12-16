@@ -1,162 +1,97 @@
 import 'dart:convert';
-import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 class ScheduleService {
-  String? _resolved;
+  // Gunakan baseUrl yang sama dengan service lain
+  static const String baseUrl = 'http://192.168.10.239:8000/api';
+  // Untuk testing lokal: http://localhost:8000/api
+  // Untuk device: http://{IP_KOMPUTER}:8000/api
 
-  // Opsi override via dart-define:
-  // flutter run --dart-define=BASE_API=http://192.168.1.13:8000/api
-  static const String _envBaseApi = String.fromEnvironment('BASE_API');
-
-  // Kandidat runtime (bisa di-set dari UI debug)
-  List<String> _customCandidates = [];
-
-  void setCandidates(List<String> candidates) {
-    _customCandidates = candidates;
-    _resolved = null;
+  static Map<String, String> _getHeaders() {
+    return {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      // Tambahkan Authorization jika perlu
+      // 'Authorization': 'Bearer YOUR_TOKEN_HERE',
+    };
   }
 
-  Future<String> _getBaseUrl() async {
-    if (_resolved != null) return _resolved!;
-
-    if (_envBaseApi.isNotEmpty) {
-      _resolved = _envBaseApi;
-      debugPrint("✅ Using BASE_API from env: $_resolved");
-      return _resolved!;
-    }
-
-    List<String> candidates;
-    if (_customCandidates.isNotEmpty) {
-      candidates = List.from(_customCandidates);
-    } else if (kIsWeb) {
-      candidates = ["http://localhost:8000/api", "http://127.0.0.1:8000/api"];
-    } else if (Platform.isAndroid) {
-      candidates = [
-        // Prioritaskan IP komputer kamu di jaringan 192.168.1.x
-        "http://192.168.1.13:8000/api",
-        // fallback untuk emulator dan loopback
-        "http://10.0.2.2:8000/api",
-        "http://127.0.0.1:8000/api",
-      ];
-    } else if (Platform.isIOS) {
-      candidates = [
-        "http://192.168.1.13:8000/api",
-        "http://localhost:8000/api",
-        "http://127.0.0.1:8000/api",
-      ];
-    } else {
-      candidates = ["http://localhost:8000/api", "http://127.0.0.1:8000/api"];
-    }
-
-    debugPrint("🔍 Checking API candidates: $candidates");
-
-    for (final c in candidates) {
-      try {
-        final uri = Uri.parse("$c/schedules");
-        final res = await http.get(uri).timeout(const Duration(seconds: 4));
-        if (res.statusCode == 200) {
-          debugPrint("✅ Using API: $c");
-          _resolved = c;
-          return c;
-        } else {
-          debugPrint("⚠️ Candidate $c responded ${res.statusCode}");
-        }
-      } on SocketException catch (se) {
-        debugPrint("❌ Candidate $c failed (SocketException): $se");
-      } on HttpException catch (he) {
-        debugPrint("❌ Candidate $c failed (HttpException): $he");
-      } on FormatException catch (fe) {
-        debugPrint("❌ Candidate $c failed (FormatException): $fe");
-      } catch (e) {
-        debugPrint("❌ Candidate $c failed: $e");
-      }
-    }
-
-    _resolved = Platform.isAndroid
-        ? (candidates.isNotEmpty
-              ? candidates.first
-              : "http://10.0.2.2:8000/api")
-        : (candidates.isNotEmpty
-              ? candidates.first
-              : "http://localhost:8000/api");
-
-    debugPrint("🔧 Fallback base URL: $_resolved");
-    return _resolved!;
-  }
-
-  Future<List<dynamic>> fetchHolidays({int? year}) async {
+  // 1. Get Holidays
+  static Future<List<dynamic>> fetchHolidays({int? year}) async {
     try {
-      final root = await _getBaseUrl();
       final url = year != null
-          ? "$root/schedules?year=$year"
-          : "$root/schedules";
-      final res = await http
-          .get(Uri.parse(url))
-          .timeout(const Duration(seconds: 8));
-      if (res.statusCode == 200) {
-        final body = jsonDecode(res.body);
+          ? '$baseUrl/schedules?year=$year'
+          : '$baseUrl/schedules';
+
+      final response = await http.get(Uri.parse(url), headers: _getHeaders());
+
+      print('Fetch Response: ${response.statusCode}');
+      print('Body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
         return body is List ? body : [];
-      }
-      debugPrint("⚠️ fetchHolidays non-200: ${res.statusCode} ${res.body}");
-      return [];
-    } catch (e) {
-      debugPrint("❌ ERROR fetchHolidays: $e");
-      return [];
-    }
-  }
-
-  Future<bool> addHoliday(String date, String name) async {
-    try {
-      final root = await _getBaseUrl();
-      final uri = Uri.parse("$root/schedules");
-      final res = await http
-          .post(
-            uri,
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'date': date, 'name': name}),
-          )
-          .timeout(const Duration(seconds: 8));
-      final ok = res.statusCode == 200 || res.statusCode == 201;
-      if (!ok)
-        debugPrint("⚠️ addHoliday failed: ${res.statusCode} ${res.body}");
-      return ok;
-    } catch (e) {
-      debugPrint("❌ ERROR addHoliday: $e");
-      return false;
-    }
-  }
-
-  Future<bool> deleteHoliday(int id) async {
-    try {
-      final root = await _getBaseUrl();
-      final res = await http
-          .delete(Uri.parse("$root/schedules/$id"))
-          .timeout(const Duration(seconds: 8));
-      final ok = res.statusCode == 200 || res.statusCode == 204;
-      if (!ok)
-        debugPrint("⚠️ deleteHoliday failed: ${res.statusCode} ${res.body}");
-      return ok;
-    } catch (e) {
-      debugPrint("❌ ERROR deleteHoliday: $e");
-      return false;
-    }
-  }
-
-  Future<void> syncNationalHolidays(int year) async {
-    try {
-      final root = await _getBaseUrl();
-      final res = await http
-          .get(Uri.parse("$root/schedules/sync?year=$year"))
-          .timeout(const Duration(seconds: 12));
-      if (res.statusCode == 200) {
-        debugPrint("✅ Sync selesai: ${res.body}");
       } else {
-        debugPrint("❌ Sync gagal: ${res.statusCode} ${res.body}");
+        throw Exception('Failed to fetch holidays');
       }
     } catch (e) {
-      debugPrint("❌ ERROR syncNationalHolidays: $e");
+      print('Error fetching holidays: $e');
+      return [];
+    }
+  }
+
+  // 2. Add Holiday
+  static Future<bool> addHoliday(String date, String name) async {
+    try {
+      final uri = Uri.parse('$baseUrl/schedules');
+      final response = await http.post(
+        uri,
+        headers: _getHeaders(),
+        body: jsonEncode({'date': date, 'name': name}),
+      );
+
+      print('Add Response: ${response.statusCode}');
+      print('Body: ${response.body}');
+
+      return response.statusCode == 200 || response.statusCode == 201;
+    } catch (e) {
+      print('Error adding holiday: $e');
+      return false;
+    }
+  }
+
+  // 3. Delete Holiday
+  static Future<bool> deleteHoliday(int id) async {
+    try {
+      final uri = Uri.parse('$baseUrl/schedules/$id');
+      final response = await http.delete(uri, headers: _getHeaders());
+
+      print('Delete Response: ${response.statusCode}');
+      print('Body: ${response.body}');
+
+      return response.statusCode == 200 || response.statusCode == 204;
+    } catch (e) {
+      print('Error deleting holiday: $e');
+      return false;
+    }
+  }
+
+  // 4. Sync National Holidays
+  static Future<void> syncNationalHolidays(int year) async {
+    try {
+      final uri = Uri.parse('$baseUrl/schedules/sync?year=$year');
+      final response = await http.get(uri, headers: _getHeaders());
+
+      print('Sync Response: ${response.statusCode}');
+      print('Body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        print('✅ Sync selesai');
+      } else {
+        print('❌ Sync gagal');
+      }
+    } catch (e) {
+      print('Error syncing holidays: $e');
     }
   }
 }

@@ -60,7 +60,7 @@ class _ScheduleAddPageState extends State<ScheduleAddPage> {
     setState(() => _isSubmitting = true);
     try {
       final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate!);
-      final success = await _service.addHoliday(
+      final success = await ScheduleService.addHoliday(
         dateStr,
         _nameController.text.trim(),
       );
