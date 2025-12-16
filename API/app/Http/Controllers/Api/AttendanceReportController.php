@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\CheckClock;
 use Illuminate\Http\Request;
+use App\Exports\AttendanceReportExport;
+use Maatwebsite\Excel\Facades\Excel;
 
 class AttendanceReportController extends Controller
 {
@@ -52,5 +54,17 @@ class AttendanceReportController extends Controller
             'data' => $data,
             'message' => 'Laporan absensi berhasil diambil'
         ]);
+    }
+    // Export to Excel
+    public function export(Request $request)
+    {
+        $startDate = $request->start_date;
+        $endDate   = $request->end_date;
+        $employeeName = $request->employee_name;
+
+        return Excel::download(
+            new AttendanceReportExport($startDate, $endDate, $employeeName),
+            'attendance-report.xlsx'
+        );
     }
 }

@@ -41,12 +41,12 @@ class AppDrawer extends StatelessWidget {
             onTap: () {
               context.go('/attendance_report_page');
             },
+          ),
           ListTile(
             leading: const Icon(Icons.access_time),
             title: const Text("Absensi"),
             onTap: () => context.go('/attendance'),
           ),
-
         ],
       ),
     );

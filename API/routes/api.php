@@ -39,3 +39,4 @@ Route::apiResource('/letters', LetterController::class);
 Route::apiResource('/letter-formats', LetterFormatController::class);
 
 Route::get('/attendance/report', [AttendanceReportController::class, 'index']);
+Route::get('attendance/report/export', [AttendanceReportController::class, 'export']);
