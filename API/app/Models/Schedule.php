@@ -8,5 +8,10 @@ use Carbon\Carbon;
 
 class Schedule extends Model
 {
-    //
+    protected $fillable = ['date', 'name'];
+
+    public static function isHoliday($date)
+    {
+        return self::where('date', $date)->exists();
+    }
 }

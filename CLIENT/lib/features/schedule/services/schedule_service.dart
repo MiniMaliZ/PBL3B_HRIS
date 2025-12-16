@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 
 class ScheduleService {
   // Gunakan baseUrl yang sama dengan service lain
-  static const String baseUrl = 'http://192.168.10.239:8000/api';
+  static const String baseUrl = 'http://localhost:8000/api';
   // Untuk testing lokal: http://localhost:8000/api
   // Untuk device: http://{IP_KOMPUTER}:8000/api
 
