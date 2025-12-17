@@ -1,7 +1,11 @@
-import 'package:flutter/material.dart';
 import 'dart:convert';
+import 'dart:io'; // 🔹 MODIFIKASI: nonaktifkan untuk Web
+import 'package:flutter/foundation.dart' show kIsWeb; // 🔹 MODIFIKASI
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import '../../widgets/app_drawer.dart';
+import 'package:path_provider/path_provider.dart'; // 🔹 MODIFIKASI
+import 'package:open_filex/open_filex.dart'; // 🔹 MODIFIKASI
+import 'dart:html' as html; // 🔹 MODIFIKASI: untuk Web download
 
 class AttendanceReportPage extends StatefulWidget {
   const AttendanceReportPage({super.key});
@@ -11,230 +15,230 @@ class AttendanceReportPage extends StatefulWidget {
 }
 
 class _AttendanceReportPageState extends State<AttendanceReportPage> {
-  List<dynamic> employees = [];
-  List<String> employeeNames = [];
-  String? selectedEmployee;
+  List<dynamic> attendanceData = [];
+  String? selectedEmployeeName;
   DateTime? selectedDate;
-  bool loading = false;
+  bool isLoading = false;
+
+  final TextEditingController employeeController = TextEditingController();
+
+  // ⚠️ gunakan 10.0.2.2 untuk emulator Android
+  final String baseUrl = kIsWeb ? 'http://192.168.1.104:8000/api' : 'http://10.0.2.2:8000/api'; // 🔹 MODIFIKASI
 
   @override
   void initState() {
     super.initState();
-    fetchEmployees();
+    fetchAttendanceReport();
   }
 
-Future<void> fetchEmployees() async {
-  setState(() => loading = true);
+  // ================= FETCH REPORT =================
+  Future<void> fetchAttendanceReport() async {
+    setState(() => isLoading = true);
 
-  // base URL
-  String url = 'http://localhost:8000/api/check-clocks';
+    Map<String, String> queryParams = {};
 
-  // tambah query parameter IF ada filter
-  Map<String, String> query = {};
-
-  if (selectedEmployee != null && selectedEmployee!.isNotEmpty) {
-    query['employee_name'] = selectedEmployee!;
-  }
-
-  if (selectedDate != null) {
-    query['date'] =
-        "${selectedDate!.year}-${selectedDate!.month.toString().padLeft(2, '0')}-${selectedDate!.day.toString().padLeft(2, '0')}";
-  }
-
-  final uri = Uri.parse(url).replace(queryParameters: query);
-
-  try {
-    final response = await http.get(uri);
-
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-
-      setState(() {
-        employees = data;
-
-        // ambil daftar nama untuk dropdown (supaya tetap dinamis)
-        employeeNames = employees
-            .map<String>((e) => (e['employee_name'] ?? 'Unknown') as String)
-            .toSet()
-            .toList();
-      });
+    if (selectedEmployeeName != null && selectedEmployeeName!.isNotEmpty) {
+      queryParams['employee_name'] = selectedEmployeeName!;
     }
-  } catch (e) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Error: $e")),
-    );
-  } finally {
-    setState(() => loading = false);
+
+    if (selectedDate != null) {
+      String date =
+          "${selectedDate!.year}-${selectedDate!.month.toString().padLeft(2, '0')}-${selectedDate!.day.toString().padLeft(2, '0')}";
+      queryParams['start_date'] = date;
+      queryParams['end_date'] = date;
+    }
+
+    final uri = Uri.parse('$baseUrl/attendance/report')
+        .replace(queryParameters: queryParams);
+
+    try {
+      final response = await http.get(uri);
+
+      if (response.statusCode == 200) {
+        final json = jsonDecode(response.body);
+        setState(() {
+          attendanceData = json['data'] ?? [];
+        });
+      } else {
+        throw Exception('Gagal ambil data');
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Error: $e')));
+    } finally {
+      setState(() => isLoading = false);
+    }
   }
-}
+
+  // ================= EXPORT EXCEL =================
+  Future<void> exportAttendanceReport() async {
+    setState(() => isLoading = true);
+
+    Map<String, String> queryParams = {};
+
+    if (selectedEmployeeName != null && selectedEmployeeName!.isNotEmpty) {
+      queryParams['employee_name'] = selectedEmployeeName!;
+    }
+
+    if (selectedDate != null) {
+      String date =
+          "${selectedDate!.year}-${selectedDate!.month.toString().padLeft(2, '0')}-${selectedDate!.day.toString().padLeft(2, '0')}";
+      queryParams['start_date'] = date;
+      queryParams['end_date'] = date;
+    }
+
+    try {
+      final uri = Uri.parse('$baseUrl/attendance/report/export')
+          .replace(queryParameters: queryParams);
+
+      final response = await http.get(uri);
+
+      if (response.statusCode == 200) {
+        if (kIsWeb) {
+          // 🔹 MODIFIKASI: Web download
+          final bytes = response.bodyBytes;
+          final blob = html.Blob([bytes],
+              'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+          final url = html.Url.createObjectUrlFromBlob(blob);
+          final anchor = html.document.createElement('a') as html.AnchorElement
+            ..href = url
+            ..download =
+                'attendance-report-${DateTime.now().millisecondsSinceEpoch}.xlsx';
+          html.document.body!.append(anchor);
+          anchor.click();
+          anchor.remove();
+          html.Url.revokeObjectUrl(url);
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Export berhasil (Web)')),
+          );
+        } else {
+          // 🔹 MODIFIKASI: Mobile/Emulator
+          final dir = await getApplicationDocumentsDirectory();
+          final filePath =
+              '${dir.path}/attendance-report-${DateTime.now().millisecondsSinceEpoch}.xlsx';
+          final file = File(filePath);
+          await file.writeAsBytes(response.bodyBytes);
+
+          ScaffoldMessenger.of(context)
+              .showSnackBar(const SnackBar(content: Text('Export berhasil')));
+
+          await OpenFilex.open(filePath);
+        }
+      } else {
+        throw Exception('Gagal export');
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Export error: $e')));
+    } finally {
+      setState(() => isLoading = false);
+    }
+  }
+
+  // ================= PICK DATE =================
   Future<void> _pickDate() async {
+    final DateTime now = DateTime.now();
     final DateTime? picked = await showDatePicker(
       context: context,
+      initialDate: selectedDate ?? now,
       firstDate: DateTime(2000),
       lastDate: DateTime(2100),
-      initialDate: selectedDate ?? DateTime.now(),
     );
-
-    if (picked != null) setState(() => selectedDate = picked);
+    if (picked != null) {
+      setState(() => selectedDate = picked);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      drawer: const AppDrawer(),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        title: const Text(
-          "Attendance Report",
-          style: TextStyle(
-            color: Color(0xFF29497D),
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        iconTheme: const IconThemeData(color: Colors.black),
-        elevation: 1,
-      ),
-
+      appBar: AppBar(title: const Text("Attendance Report")),
       body: Padding(
         padding: const EdgeInsets.all(15),
         child: Column(
           children: [
-            // ===================== FILTER =====================
-            Container(
-              padding: const EdgeInsets.all(15),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.07),
-                    blurRadius: 8,
-                  )
-                ],
+            TextField(
+              controller: employeeController,
+              decoration: const InputDecoration(
+                labelText: "Nama Karyawan",
+                border: OutlineInputBorder(),
               ),
-              child: Column(
-                children: [
-                  Autocomplete<String>(
-                  optionsBuilder: (TextEditingValue textEditingValue) {
-                    // Jika kosong → tampilkan semua nama
-                    if (textEditingValue.text.isEmpty) {
-                      return employeeNames;
-                    }
-
-                    // Filter berdasarkan input
-                    final results = employeeNames.where((name) =>
-                        name.toLowerCase().contains(textEditingValue.text.toLowerCase())
-                    ).toList();
-
-                    // Jika tidak ada hasil, tampilkan semua nama
-                    if (results.isEmpty) {
-                      return employeeNames;
-                    }
-
-                    return results;
-                  },
-                  onSelected: (String selection) {
-                    setState(() => selectedEmployee = selection);
-                  },
-                  fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
-                    return TextField(
-                      controller: controller,
-                      focusNode: focusNode,
-                      decoration: const InputDecoration(
-                        labelText: "Cari Karyawan",
-                        border: OutlineInputBorder(),
-                      ),
-                      onChanged: (value) {
-                        setState(() => selectedEmployee = null);
-                      },
-                    );
-                  },
-                ),
-
-
-                  const SizedBox(height: 10),
-
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: fetchEmployees,
-                      icon: const Icon(Icons.search, color: Colors.white),
-                      label: const Text(
-                        "Cari",
-                        style: TextStyle(color: Colors.white),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF29497D),
-                      ),
+              onChanged: (value) => selectedEmployeeName = value,
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              readOnly: true,
+              decoration: InputDecoration(
+                labelText: selectedDate == null
+                    ? "Pilih Tanggal"
+                    : "${selectedDate!.day}/${selectedDate!.month}/${selectedDate!.year}",
+                border: const OutlineInputBorder(),
+                suffixIcon: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.calendar_today),
+                      onPressed: _pickDate,
                     ),
-                  )
-                ],
+                    if (selectedDate != null) // 🔹 tombol hapus muncul kalau ada tanggal
+                      IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          setState(() {
+                            selectedDate = null; // 🔹 hapus tanggal
+                          });
+                        },
+                      ),
+                  ],
+                ),
               ),
             ),
-
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: fetchAttendanceReport,
+                    child: const Text("Cari"),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: exportAttendanceReport,
+                    child: const Text("Export Excel"),
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 20),
-
-            // ===================== TABLE =====================
-            loading
-                ? const Center(child: CircularProgressIndicator())
+            isLoading
+                ? const CircularProgressIndicator()
                 : Expanded(
                     child: SingleChildScrollView(
-                      scrollDirection: Axis.vertical,
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: ConstrainedBox(
-                          constraints: BoxConstraints(
-                            minWidth: MediaQuery.of(context).size.width,
-                          ),
-                          child: DataTable(
-                            headingRowColor: MaterialStateProperty.all(
-                              const Color(0xFF29497D),
-                            ),
-                            columns: const [
-                              DataColumn(
-                                label: Text("Employee ID",
-                                    style: TextStyle(color: Colors.white)),
-                              ),
-                              DataColumn(
-                                label: Text("Employee Name",
-                                    style: TextStyle(color: Colors.white)),
-                              ),
-                              DataColumn(
-                                label: Text("Tanggal",
-                                    style: TextStyle(color: Colors.white)),
-                              ),
-                              DataColumn(
-                                label: Text("Clock In",
-                                    style: TextStyle(color: Colors.white)),
-                              ),
-                              DataColumn(
-                                label: Text("Clock Out",
-                                    style: TextStyle(color: Colors.white)),
-                              ),
-                              DataColumn(
-                                label: Text("Overtime Start",
-                                    style: TextStyle(color: Colors.white)),
-                              ),
-                              DataColumn(
-                                label: Text("Overtime End",
-                                    style: TextStyle(color: Colors.white)),
-                              ),
-                            ],
-                            rows: employees.map((e) {
-                              return DataRow(
-                                cells: [
-                                  DataCell(Text(e['employee_id'].toString())),
-                                  DataCell(Text(e['employee_name'] ?? '-')),  
-                                  DataCell(Text(e['date'] ?? '-')),
-                                  DataCell(Text(e['clock_in'] ?? '-')),
-                                  DataCell(Text(e['clock_out'] ?? '-')),
-                                  DataCell(Text(e['overtime_start'] ?? '-')),
-                                  DataCell(Text(e['overtime_end'] ?? '-')),
-                                ],
-                              );
-                            }).toList(),
-                          ),
-                        ),
+                      scrollDirection: Axis.horizontal,
+                      child: DataTable(
+                        columns: const [
+                          DataColumn(label: Text("Nama")),
+                          DataColumn(label: Text("Departemen")),
+                          DataColumn(label: Text("Tanggal")),
+                          DataColumn(label: Text("Clock In")),
+                          DataColumn(label: Text("Clock Out")),
+                          DataColumn(label: Text("OT Start")),
+                          DataColumn(label: Text("OT End")),
+                        ],
+                        rows: attendanceData.map((e) {
+                          return DataRow(cells: [
+                            DataCell(Text(e['employee_name'] ?? '-')),
+                            DataCell(Text(e['department'] ?? '-')),
+                            DataCell(Text(e['date'] ?? '-')),
+                            DataCell(Text(e['clock_in'] ?? '-')),
+                            DataCell(Text(e['clock_out'] ?? '-')),
+                            DataCell(Text(e['overtime_start'] ?? '-')),
+                            DataCell(Text(e['overtime_end'] ?? '-')),
+                          ]);
+                        }).toList(),
                       ),
                     ),
                   ),

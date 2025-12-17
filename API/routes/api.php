@@ -4,8 +4,9 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\LetterController;
 use App\Http\Controllers\CheckClockController;
+use App\Http\Controllers\Api\AttendanceReportController;
 
-Route::apiResource('letter-formats', LetterFormatController::class);
+// Route::apiResource('letter-formats', LetterFormatController::class);
 Route::apiResource('letters', LetterController::class);
 
 Route::get('/check-clocks', [CheckClockController::class, 'index']);
@@ -36,3 +37,6 @@ Route::get('/attendance/history/{employeeId}', [AttendanceController::class, 'ge
 
 Route::apiResource('/letters', LetterController::class);
 Route::apiResource('/letter-formats', LetterFormatController::class);
+
+Route::get('/attendance/report', [AttendanceReportController::class, 'index']);
+Route::get('attendance/report/export', [AttendanceReportController::class, 'export']);

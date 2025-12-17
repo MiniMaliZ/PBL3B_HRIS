@@ -8,99 +8,89 @@ use App\Models\Employee;
 use App\Models\User;
 use App\Models\Position;
 use App\Models\LetterFormat;
+use App\Models\CheckClock;
+use Carbon\Carbon;
 
 class DatabaseSeeder extends Seeder
 {
     public function run()
     {
-        // $this->call(UsersSeeder::class);
-        $this->call(LetterFormatsSeeder::class);
-        $this->call(LettersSeeder::class);
-        
-        $this->call([
-        EmployeeSeeder::class,     // harus duluan
-        CheckClockSeeder::class,    // baru check_clocks
-    ]);
-
         $this->command->info('🔄 Starting seeding...');
 
+        // -----------------------------
         // 1. Buat positions
+        // -----------------------------
         $this->command->info('📝 Creating positions...');
-
         Position::create([
             'name' => 'Manager',
             'rate_reguler' => 50000,
             'rate_overtime' => 75000
         ]);
-
         Position::create([
             'name' => 'Senior Developer',
             'rate_reguler' => 40000,
             'rate_overtime' => 60000
         ]);
-
         Position::create([
             'name' => 'Junior Developer',
             'rate_reguler' => 30000,
             'rate_overtime' => 45000
         ]);
-
         Position::create([
             'name' => 'Staff',
             'rate_reguler' => 25000,
             'rate_overtime' => 37500
         ]);
-
         $this->command->info('✅ Positions created: ' . Position::count());
 
+        // -----------------------------
         // 2. Buat departments
+        // -----------------------------
         $this->command->info('🏢 Creating departments...');
-
         Department::create([
             'name' => 'IT Department',
             'radius' => '50',
             'latitude' => -6.2088,
             'longitude' => 106.8456
         ]);
-
         Department::create([
             'name' => 'HR Department',
             'radius' => '50',
             'latitude' => -6.2088,
             'longitude' => 106.8456
         ]);
-
         Department::create([
             'name' => 'Finance Department',
             'radius' => '50',
             'latitude' => -6.2088,
             'longitude' => 106.8456
         ]);
-
         $this->command->info('✅ Departments created: ' . Department::count());
 
+        // -----------------------------
         // 3. Buat letter formats
+        // -----------------------------
         $this->command->info('📄 Creating letter formats...');
-
         LetterFormat::create([
             'name' => 'Surat Izin Sakit',
             'content' => 'Template surat izin sakit...'
         ]);
-
         LetterFormat::create([
             'name' => 'Surat Izin Cuti',
             'content' => 'Template surat izin cuti...'
         ]);
-
         LetterFormat::create([
             'name' => 'Surat Keterangan',
             'content' => 'Template surat keterangan...'
         ]);
-
         $this->command->info('✅ Letter formats created: ' . LetterFormat::count());
 
+        // -----------------------------
         // 4. Buat users dan employees
+        // -----------------------------
         $this->command->info('👤 Creating users and employees...');
+
+        $employeesArr = [];
 
         // Admin
         $user1 = User::create([
@@ -108,8 +98,7 @@ class DatabaseSeeder extends Seeder
             'password' => bcrypt('password'),
             'is_admin' => true,
         ]);
-
-        Employee::create([
+        $employeesArr[] = Employee::create([
             'user_id' => $user1->id,
             'position_id' => 1,
             'department_id' => 1,
@@ -125,8 +114,7 @@ class DatabaseSeeder extends Seeder
             'password' => bcrypt('password'),
             'is_admin' => false,
         ]);
-
-        Employee::create([
+        $employeesArr[] = Employee::create([
             'user_id' => $user2->id,
             'position_id' => 2,
             'department_id' => 1,
@@ -142,8 +130,7 @@ class DatabaseSeeder extends Seeder
             'password' => bcrypt('password'),
             'is_admin' => false,
         ]);
-
-        Employee::create([
+        $employeesArr[] = Employee::create([
             'user_id' => $user3->id,
             'position_id' => 3,
             'department_id' => 2,
@@ -159,8 +146,7 @@ class DatabaseSeeder extends Seeder
             'password' => bcrypt('password'),
             'is_admin' => false,
         ]);
-
-        Employee::create([
+        $employeesArr[] = Employee::create([
             'user_id' => $user4->id,
             'position_id' => 4,
             'department_id' => 3,
@@ -176,8 +162,7 @@ class DatabaseSeeder extends Seeder
             'password' => bcrypt('password'),
             'is_admin' => false,
         ]);
-
-        Employee::create([
+        $employeesArr[] = Employee::create([
             'user_id' => $user5->id,
             'position_id' => 2,
             'department_id' => 1,
@@ -189,6 +174,29 @@ class DatabaseSeeder extends Seeder
 
         $this->command->info('✅ Users created: ' . User::count());
         $this->command->info('✅ Employees created: ' . Employee::count());
+
+        // -----------------------------
+        // 5. Attendance (CheckClock) dummy
+        // -----------------------------
+        $this->command->info('⏰ Creating attendance records...');
+        $dates = collect(range(0, 4))->map(fn($i) => Carbon::now()->subDays($i)); // 5 hari terakhir
+        foreach ($employeesArr as $emp) {
+            foreach ($dates as $date) {
+                CheckClock::create([
+                    'employee_id' => $emp->id,
+                    'employee_name' => $emp->first_name . ' ' . $emp->last_name,
+                    'date' => $date->format('Y-m-d'),
+                    'clock_in' => '08:00:00',
+                    'clock_out' => '17:00:00',
+                    'overtime_start' => '17:15:00',
+                    'overtime_end' => '19:00:00',
+                    'check_clock_type' => 1,
+                    'latitude' => 0.0,
+                    'longitude' => 0.0,
+                ]);
+            }
+        }
+        $this->command->info('✅ Attendance records created for all employees.');
 
         $this->command->info('');
         $this->command->info('✅ Database seeded successfully!');
